@@ -1,26 +1,18 @@
 package storage
 
 import (
-	"context"
 	"errors"
 	"github.com/amirylm/libp2p-facade/core"
 	"github.com/ipfs/go-bitswap"
 	"github.com/ipfs/go-bitswap/network"
 	"github.com/ipfs/go-blockservice"
-	"github.com/ipfs/go-datastore"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	exoffline "github.com/ipfs/go-ipfs-exchange-offline"
 	provider "github.com/ipfs/go-ipfs-provider"
 	"github.com/ipfs/go-ipfs-provider/queue"
 	"github.com/ipfs/go-ipfs-provider/simple"
 	ipld "github.com/ipfs/go-ipld-format"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/go-merkledag"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/pnet"
-	kaddht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"time"
 )
 
@@ -28,7 +20,7 @@ const (
 	defaultReprovideInterval = 8 * time.Hour
 )
 
-//
+// StoragePeer represents a peer with storage capabilities
 type StoragePeer interface {
 	core.LibP2PPeer
 
@@ -37,10 +29,11 @@ type StoragePeer interface {
 	Reprovider() provider.System
 }
 
+// storagePeer is the implementation of StoragePeer interface
 type storagePeer struct {
 	ipld.DAGService
 
-	base *core.BasePeer
+	core.LibP2PPeer
 
 	bsrv       blockservice.BlockService
 	reprovider provider.System
@@ -135,10 +128,6 @@ func (sp *storagePeer) Reprovider() provider.System {
 	return sp.reprovider
 }
 
-func (sp *storagePeer) Context() context.Context {
-	return sp.base.Context()
-}
-
 func (sp *storagePeer) Close() error {
 	errs := []error{}
 
@@ -149,42 +138,12 @@ func (sp *storagePeer) Close() error {
 		errs = append(errs, err)
 	}
 
-	baseErr := sp.base.Close()
+	baseErrs := core.Close(sp)
 
 	if len(errs) == 0 {
-		return baseErr
+		if len(baseErrs) == 0 {
+			return nil
+		}
 	}
-	return errors.New("could not close ipld node")
-}
-
-func (sp *storagePeer) PrivKey() crypto.PrivKey {
-	return sp.base.PrivKey()
-}
-
-func (sp *storagePeer) Psk() pnet.PSK {
-	return sp.base.Psk()
-}
-
-func (sp *storagePeer) Host() host.Host {
-	return sp.base.Host()
-}
-
-func (sp *storagePeer) DHT() *kaddht.IpfsDHT {
-	return sp.base.DHT()
-}
-
-func (sp *storagePeer) Store() datastore.Batching {
-	return sp.base.Store()
-}
-
-func (sp *storagePeer) Logger() logging.EventLogger {
-	return sp.base.Logger()
-}
-
-func (sp *storagePeer) PubSub() *pubsub.PubSub {
-	return sp.base.PubSub()
-}
-
-func (sp *storagePeer) Topics() map[string]*pubsub.Topic {
-	return sp.base.Topics()
+	return errors.New("could not close peer")
 }
